@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { auditLogsAPI } from '../services/api';
+import { auditLogsAPI, districtsAPI } from '../services/api';
 
 const demoDistricts = [
   { name: 'Kamrup Metropolitan', state: 'Assam', code: 'KAM', accessibilityScore: 92, totalRoads: 340, openRoads: 310, riskyRoads: 22, blockedRoads: 8, activeIncidents: 2, activeVehicles: 45, criticalDeliveries: 3, riskLevel: 'Low', weatherCondition: 'Light Rain', temp: 28, rainfall: 45 },
@@ -19,17 +19,46 @@ const demoDistricts = [
 const riskColors = { Low: '#059669', Medium: '#d97706', High: '#dc2626', Critical: '#dc2626' };
 
 export default function Settings({ user }) {
+  const [districts, setDistricts] = useState(demoDistricts);
   const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
   const canViewAudit = ['admin', 'government_official'].includes(user?.role);
 
   useEffect(() => {
+    districtsAPI.getAll().then(res => {
+      if (res?.data?.length) {
+        const formatted = res.data.map(d => ({
+          name: d.name,
+          state: d.state || 'NER',
+          code: d.code || d.name.slice(0, 3).toUpperCase(),
+          accessibilityScore: d.accessibilityScore || 70,
+          totalRoads: d.roadStats?.total || d.totalRoads || 0,
+          openRoads: d.roadStats?.open || d.openRoads || 0,
+          riskyRoads: d.roadStats?.risky || d.riskyRoads || 0,
+          blockedRoads: d.roadStats?.blocked || d.blockedRoads || 0,
+          activeIncidents: d.activeIncidents || 0,
+          activeVehicles: d.activeVehicles || 8,
+          criticalDeliveries: d.criticalDeliveries || 2,
+          riskLevel: d.riskLevel || (d.accessibilityScore >= 75 ? 'Low' : d.accessibilityScore >= 60 ? 'Medium' : 'High'),
+          weatherCondition: d.weather?.condition || 'Rainy',
+          temp: d.weather?.temperature || 24,
+          rainfall: d.weather?.rainfall || 50
+        }));
+        setDistricts(formatted);
+        setSelectedDistrict(formatted[0]);
+      } else {
+        setSelectedDistrict(demoDistricts[0]);
+      }
+    }).catch(() => {
+      setSelectedDistrict(demoDistricts[0]);
+    });
+
     if (canViewAudit) {
       auditLogsAPI.getAll().then(res => {
         if (res?.data?.length) setAuditLogs(res.data);
       }).catch(() => {});
     }
-  }, [user]);
+  }, [user, canViewAudit]);
 
   return (
     <div>
@@ -70,7 +99,7 @@ export default function Settings({ user }) {
                 </tr>
               </thead>
               <tbody>
-                {demoDistricts.map(d => (
+                {districts.map(d => (
                   <tr key={d.code} style={{ cursor: 'pointer', background: selectedDistrict?.code === d.code ? '#eff6ff' : '' }} onClick={() => setSelectedDistrict(d)}>
                     <td><strong>{d.name}</strong></td>
                     <td>{d.state}</td>

@@ -47,6 +47,8 @@ export const vehiclesAPI = {
   getAll: (params) => api.get('/vehicles', { params }),
   getById: (id) => api.get(`/vehicles/${id}`),
   getMyVehicle: () => api.get('/vehicles/my-vehicle'),
+  create: (data) => api.post('/vehicles', data),
+  update: (id, data) => api.put(`/vehicles/${id}`, data),
   updateLocation: (id, data) => api.put(`/vehicles/${id}/location`, data),
   updateTelemetry: (id, data) => api.put(`/vehicles/${id}/location`, data),
   getStats: () => api.get('/vehicles/stats/summary')
@@ -106,6 +108,13 @@ export const routesAPI = {
   acceptReroute: (id) => api.put(`/routes/${id}/accept-reroute`)
 };
 
+// Upload
+export const uploadAPI = {
+  uploadPhoto: (formData) => api.post('/upload/photo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+};
+
 // Audit Logs
 export const auditLogsAPI = {
   getAll: (params) => api.get('/audit-logs', { params })
@@ -121,6 +130,8 @@ export const predictAPI = {
 // Analytics
 export const analyticsAPI = {
   getOverview: () => api.get('/analytics/overview'),
+  getInsights: () => api.get('/analytics/insights'),
+  getBottlenecks: () => api.get('/analytics/bottlenecks'),
   getIncidentsByType: () => api.get('/analytics/incidents-by-type'),
   getDeliveriesByStatus: () => api.get('/analytics/deliveries-by-status'),
   getRoadsByDistrict: () => api.get('/analytics/roads-by-district')

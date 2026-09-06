@@ -33,6 +33,7 @@ app.use('/api/predict', require('./routes/predict'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/routes', require('./routes/routes'));
 app.use('/api/audit-logs', require('./routes/auditLogs'));
+app.use('/api/upload', require('./routes/upload'));
 
 // Health check
 app.get('/api/health', (req, res) => {

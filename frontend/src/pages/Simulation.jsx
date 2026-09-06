@@ -114,13 +114,16 @@ const SCENARIO_STEPS = [
   }
 ];
 
-export default function Simulation() {
+export default function Simulation({ user }) {
   const [currentStep, setCurrentStep] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
 
+  const canControl = ['admin', 'government_official'].includes(user?.role);
+  const isViewOnly = !canControl;
+
   useEffect(() => {
     let timer;
-    if (isPlaying) {
+    if (isPlaying && canControl) {
       timer = setInterval(() => {
         setCurrentStep(prev => {
           if (prev < SCENARIO_STEPS.length) return prev + 1;
@@ -130,11 +133,12 @@ export default function Simulation() {
       }, 3500);
     }
     return () => clearInterval(timer);
-  }, [isPlaying]);
+  }, [isPlaying, canControl]);
 
   const activeStep = SCENARIO_STEPS[currentStep - 1];
 
   const handleReset = () => {
+    if (!canControl) return;
     setIsPlaying(false);
     setCurrentStep(1);
   };
@@ -147,12 +151,20 @@ export default function Simulation() {
           <p>Interactive verification of the complete 11-step disaster response and rerouting scenario</p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button className="btn btn-primary" onClick={() => setIsPlaying(!isPlaying)}>
-            {isPlaying ? <><FiPause /> Pause Simulation</> : <><FiPlay /> Run Auto-Simulation</>}
-          </button>
-          <button className="btn btn-outline" onClick={handleReset}>
-            <FiRotateCcw /> Reset
-          </button>
+          {isViewOnly ? (
+            <span className="badge-status info" style={{ padding: '6px 12px' }}>
+              👁️ View Only Mode ({user?.role?.replace('_', ' ') || 'Guest'})
+            </span>
+          ) : (
+            <>
+              <button className="btn btn-primary" onClick={() => setIsPlaying(!isPlaying)}>
+                {isPlaying ? <><FiPause /> Pause Simulation</> : <><FiPlay /> Run Auto-Simulation</>}
+              </button>
+              <button className="btn btn-outline" onClick={handleReset}>
+                <FiRotateCcw /> Reset
+              </button>
+            </>
+          )}
         </div>
       </div>
 

@@ -1,5 +1,7 @@
 const router = require('express').Router();
 const Road = require('../models/Road');
+const Alert = require('../models/Alert');
+const Delivery = require('../models/Delivery');
 const { auth, authorize } = require('../middleware/auth');
 const { logAudit } = require('../utils/auditLogger');
 
@@ -67,6 +69,50 @@ const updateRoadHandler = async (req, res) => {
       riskLevel: road.riskLevel,
       reason: req.body.reason || 'Road accessibility status update'
     });
+
+    // Auto-generate system alert on road blockage (Requirement E)
+    if (road.status === 'Blocked' && oldStatus !== 'Blocked') {
+      try {
+        const alertCount = await Alert.countDocuments();
+        const alertId = `ALT-${String(alertCount + 1).padStart(4, '0')}`;
+        await Alert.create({
+          alertId,
+          type: 'Road Blockage',
+          severity: 'Critical',
+          title: `${road.name} is BLOCKED`,
+          message: `Corridor ${road.name} in ${road.district} is completely BLOCKED. Reason: ${req.body.reason || 'Landslide disruption'}. Alternate bypass required.`,
+          location: {
+            name: road.name,
+            district: road.district,
+            lat: road.startPoint?.coordinates?.lat || 25.5,
+            lng: road.startPoint?.coordinates?.lng || 91.8
+          },
+          affectedEntities: {
+            roads: [road.roadId],
+            districts: [road.district]
+          },
+          alternateRouteAvailable: true,
+          isRead: false
+        });
+
+        // Flag active deliveries along this corridor as At Risk
+        await Delivery.updateMany(
+          { route: road.roadId, status: { $in: ['In Transit', 'Pending', 'Assigned'] } },
+          { $set: { status: 'At Risk' } }
+        );
+      } catch (alertErr) {
+        console.warn('Failed to auto-generate alert on road blockage:', alertErr.message);
+      }
+    } else if (road.status === 'Open' && oldStatus === 'Blocked') {
+      try {
+        await Alert.updateMany(
+          { 'affectedEntities.roads': road.roadId, isResolved: false },
+          { $set: { isResolved: true, isRead: true, resolvedAt: new Date() } }
+        );
+      } catch (alertErr) {
+        console.warn('Failed to resolve alert on road reopen:', alertErr.message);
+      }
+    }
 
     res.json({ success: true, data: road });
   } catch (error) {

@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const incidentSchema = new mongoose.Schema({
   incidentId: { type: String, required: true, unique: true },
-  type: { type: String, enum: ['Landslide', 'Flood', 'Road Damage', 'Bridge Damage', 'Heavy Traffic', 'Accident', 'Weather Hazard', 'Other'], required: true },
+  type: { type: String, enum: ['Landslide', 'Flood', 'Road Damage', 'Bridge Damage', 'Heavy Traffic', 'Traffic Congestion', 'Accident', 'Weather Hazard', 'Other'], required: true },
   location: {
     name: { type: String, required: true },
     district: String,

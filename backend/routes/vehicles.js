@@ -136,4 +136,51 @@ router.get('/stats/summary', async (req, res) => {
   }
 });
 
+// Create vehicle (Admin only)
+router.post('/', auth, authorize('admin'), async (req, res) => {
+  try {
+    const count = await Vehicle.countDocuments();
+    const vehicleId = req.body.vehicleId || `NER-${String(count + 101)}`;
+
+    const vehicle = new Vehicle({
+      ...req.body,
+      vehicleId,
+      lastPing: new Date()
+    });
+    await vehicle.save();
+
+    await logAudit(req, 'VEHICLE_CREATED', 'Vehicle', vehicle.vehicleId, {
+      type: vehicle.type,
+      registrationNumber: vehicle.registrationNumber,
+      cargo: vehicle.cargo,
+      driver: vehicle.driver?.name
+    });
+
+    res.status(201).json({ success: true, data: vehicle });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// Update vehicle details (Admin only)
+router.put('/:id', auth, authorize('admin'), async (req, res) => {
+  try {
+    const query = { $or: [{ vehicleId: req.params.id }] };
+    if (req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      query.$or.push({ _id: req.params.id });
+    }
+
+    const vehicle = await Vehicle.findOneAndUpdate(query, req.body, { new: true });
+    if (!vehicle) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+
+    await logAudit(req, 'VEHICLE_UPDATED', 'Vehicle', vehicle.vehicleId, {
+      updatedFields: Object.keys(req.body)
+    });
+
+    res.json({ success: true, data: vehicle });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 module.exports = router;

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { alertsAPI } from '../services/api';
-import { FiAlertTriangle, FiPlus, FiCheck } from 'react-icons/fi';
+import { alertsAPI, districtsAPI } from '../services/api';
+import { translateAlert, getCurrentLanguage, setCurrentLanguage, LANGUAGES } from '../utils/i18n';
+import { FiAlertTriangle, FiPlus, FiCheck, FiSearch, FiGlobe, FiFilter, FiRefreshCw } from 'react-icons/fi';
 
 const demoAlerts = [
   { alertId: 'ALT-0001', type: 'Road Blockage', severity: 'Critical', title: 'NH-6 Aizawl-Silchar Road Blocked', message: 'Road completely blocked due to landslide and heavy rainfall. 3 vehicles stranded. Alternate route via Tripura recommended.', location: { name: 'NH-6 near Vairengte', district: 'Aizawl' }, alternateRouteAvailable: true, isRead: false, createdAt: new Date(Date.now() - 1800000) },
@@ -23,7 +24,10 @@ function timeAgo(date) {
 
 export default function Alerts({ user }) {
   const [alerts, setAlerts] = useState(demoAlerts);
-  const [filter, setFilter] = useState({ severity: '', read: '' });
+  const [districtsList, setDistrictsList] = useState([]);
+  const [activeLang, setActiveLang] = useState(getCurrentLanguage());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filter, setFilter] = useState({ severity: '', read: '', district: '' });
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [notice, setNotice] = useState('');
   const [formData, setFormData] = useState({
@@ -37,11 +41,35 @@ export default function Alerts({ user }) {
 
   const isAdmin = user?.role === 'admin';
 
-  useEffect(() => {
+  const fetchAlerts = () => {
     alertsAPI.getAll().then(res => {
       if (res?.data?.length) setAlerts(res.data);
     }).catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchAlerts();
+    const interval = setInterval(fetchAlerts, 10000);
+
+    districtsAPI.getAll().then(res => {
+      if (res?.data?.length) setDistrictsList(res.data);
+    }).catch(() => {});
+
+    const handleLangChange = (e) => {
+      if (e.detail?.language) setActiveLang(e.detail.language);
+    };
+    window.addEventListener('languageChanged', handleLangChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('languageChanged', handleLangChange);
+    };
   }, []);
+
+  const handleLanguageSwitch = (newLang) => {
+    setActiveLang(newLang);
+    setCurrentLanguage(newLang);
+  };
 
   const handleBroadcastAlert = async (e) => {
     e.preventDefault();
@@ -81,6 +109,14 @@ export default function Alerts({ user }) {
     if (filter.severity && a.severity !== filter.severity) return false;
     if (filter.read === 'unread' && a.isRead) return false;
     if (filter.read === 'read' && !a.isRead) return false;
+    if (filter.district && a.location?.district !== filter.district) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = a.title?.toLowerCase().includes(q);
+      const matchMsg = a.message?.toLowerCase().includes(q);
+      const matchLoc = a.location?.name?.toLowerCase().includes(q) || a.location?.district?.toLowerCase().includes(q);
+      if (!matchTitle && !matchMsg && !matchLoc) return false;
+    }
     return true;
   });
 
@@ -106,9 +142,23 @@ export default function Alerts({ user }) {
       <div className="page-header">
         <div>
           <h2>Alerts & Emergency Notifications</h2>
-          <p>Real-time hazardous weather, road blockages, and supply chain advisories</p>
+          <p>Real-time multilingual hazardous weather, road blockages, and supply chain advisories</p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Quick Language Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #cbd5e1', padding: '4px 10px', borderRadius: 8 }}>
+            <FiGlobe style={{ color: '#64748b' }} />
+            <select
+              value={activeLang}
+              onChange={e => handleLanguageSwitch(e.target.value)}
+              style={{ border: 'none', background: 'transparent', fontSize: 13, fontWeight: 600, color: '#334155', cursor: 'pointer', outline: 'none' }}
+            >
+              {LANGUAGES.map(l => (
+                <option key={l.code} value={l.code}>{l.nativeName} ({l.name})</option>
+              ))}
+            </select>
+          </div>
+
           {isAdmin && (
             <button className="btn btn-primary" onClick={() => setShowBroadcastModal(true)}>
               <FiAlertTriangle /> Broadcast Alert
@@ -224,14 +274,34 @@ export default function Alerts({ user }) {
       )}
 
       {/* Filter controls */}
-      <div className="filters-bar">
-        <select className="filter-select" value={filter.severity} onChange={e => setFilter({ ...filter, severity: e.target.value })}>
+      <div className="filters-bar" style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
+        <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
+          <FiSearch style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+          <input
+            type="text"
+            className="form-control"
+            style={{ paddingLeft: 36, height: 38 }}
+            placeholder="Search alerts by corridor, text..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        <select className="filter-select" style={{ height: 38 }} value={filter.district} onChange={e => setFilter({ ...filter, district: e.target.value })}>
+          <option value="">All Districts</option>
+          {(districtsList.length > 0 ? districtsList.map(d => d.name) : ['Imphal West', 'East Khasi Hills', 'Ri-Bhoi', 'Sonitpur', 'Kohima', 'Aizawl', 'East Sikkim']).map(d => (
+            <option key={d} value={d}>{d}</option>
+          ))}
+        </select>
+
+        <select className="filter-select" style={{ height: 38 }} value={filter.severity} onChange={e => setFilter({ ...filter, severity: e.target.value })}>
           <option value="">All Severity</option>
           <option value="Critical">Critical</option>
           <option value="Warning">Warning</option>
           <option value="Info">Info</option>
         </select>
-        <select className="filter-select" value={filter.read} onChange={e => setFilter({ ...filter, read: e.target.value })}>
+
+        <select className="filter-select" style={{ height: 38 }} value={filter.read} onChange={e => setFilter({ ...filter, read: e.target.value })}>
           <option value="">All Notifications</option>
           <option value="unread">Unread Only</option>
           <option value="read">Acknowledged / Read</option>
@@ -240,39 +310,45 @@ export default function Alerts({ user }) {
 
       {/* Alert Feed */}
       <div className="card">
-        {filtered.map(alert => (
-          <div className={`alert-item ${alert.severity?.toLowerCase()}`} key={alert.alertId} style={{ opacity: alert.isRead ? 0.75 : 1 }}>
-            <span className="alert-icon">
-              {alert.severity === 'Critical' ? '🚨' : alert.severity === 'Warning' ? '⚠️' : 'ℹ️'}
-            </span>
-            <div className="alert-content" style={{ flex: 1 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                <h4 style={{ margin: 0, fontSize: 14.5 }}>{alert.title}</h4>
-                <span className={`badge-status ${alert.severity?.toLowerCase()}`}>{alert.severity}</span>
-              </div>
-              <p style={{ margin: '4px 0 8px 0', fontSize: 13, lineHeight: 1.5 }}>{alert.message}</p>
-              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#94a3b8', flexWrap: 'wrap' }}>
-                <span>📍 {alert.location?.district || alert.location?.name || 'Regional'}</span>
-                <span>🕐 {timeAgo(alert.createdAt || Date.now())}</span>
-                <span>📋 {alert.type}</span>
-                {alert.alternateRouteAvailable && <span style={{ color: '#059669', fontWeight: 600 }}>✅ Alternate route available</span>}
-              </div>
-            </div>
-            {!alert.isRead ? (
-              <button
-                className="btn btn-outline"
-                style={{ padding: '4px 10px', fontSize: 11, alignSelf: 'flex-start', marginLeft: 8 }}
-                onClick={() => handleMarkRead(alert.alertId)}
-              >
-                Acknowledge / Read
-              </button>
-            ) : (
-              <span style={{ fontSize: 11, color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
-                <FiCheck /> Read
+        {filtered.map(alert => {
+          // Multilingual translation preserving technical identifiers
+          const translatedTitle = translateAlert(alert.title, activeLang);
+          const translatedMessage = translateAlert(alert.message, activeLang);
+
+          return (
+            <div className={`alert-item ${alert.severity?.toLowerCase()}`} key={alert.alertId} style={{ opacity: alert.isRead ? 0.75 : 1 }}>
+              <span className="alert-icon">
+                {alert.severity === 'Critical' ? '🚨' : alert.severity === 'Warning' ? '⚠️' : 'ℹ️'}
               </span>
-            )}
-          </div>
-        ))}
+              <div className="alert-content" style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                  <h4 style={{ margin: 0, fontSize: 14.5 }}>{translatedTitle}</h4>
+                  <span className={`badge-status ${alert.severity?.toLowerCase()}`}>{alert.severity}</span>
+                </div>
+                <p style={{ margin: '4px 0 8px 0', fontSize: 13, lineHeight: 1.5 }}>{translatedMessage}</p>
+                <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#94a3b8', flexWrap: 'wrap' }}>
+                  <span>📍 {alert.location?.district || alert.location?.name || 'Regional'}</span>
+                  <span>🕐 {timeAgo(alert.createdAt || Date.now())}</span>
+                  <span>📋 {alert.type}</span>
+                  {alert.alternateRouteAvailable && <span style={{ color: '#059669', fontWeight: 600 }}>✅ Alternate route available</span>}
+                </div>
+              </div>
+              {!alert.isRead ? (
+                <button
+                  className="btn btn-outline"
+                  style={{ padding: '4px 10px', fontSize: 11, alignSelf: 'flex-start', marginLeft: 8 }}
+                  onClick={() => handleMarkRead(alert.alertId)}
+                >
+                  Acknowledge / Read
+                </button>
+              ) : (
+                <span style={{ fontSize: 11, color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <FiCheck /> Read
+                </span>
+              )}
+            </div>
+          );
+        })}
         {filtered.length === 0 && (
           <div style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
             No alerts found matching the selected filter.

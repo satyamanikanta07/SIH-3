@@ -1,85 +1,108 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiMapPin, FiCheckCircle, FiAlertTriangle, FiXCircle, FiTruck, FiClock, FiBell, FiAlertOctagon, FiActivity, FiArrowRight } from 'react-icons/fi';
-import { analyticsAPI, alertsAPI, deliveriesAPI, roadsAPI, vehiclesAPI } from '../services/api';
+import { FiMapPin, FiCheckCircle, FiAlertTriangle, FiXCircle, FiTruck, FiClock, FiBell, FiAlertOctagon, FiActivity, FiArrowRight, FiNavigation, FiShield } from 'react-icons/fi';
+import { analyticsAPI, alertsAPI, deliveriesAPI, districtsAPI, roadsAPI } from '../services/api';
 import DashboardMap from '../components/DashboardMap';
+import { getTranslation } from '../utils/i18n';
 
-// Demo data fallback
-const demoStats = {
-  roads: { total: 2431, open: 2120, risky: 187, blocked: 124 },
-  vehicles: { total: 542, moving: 389, delayed: 32 },
-  incidents: { total: 48, active: 17 },
-  deliveries: { total: 156, delayed: 32, inTransit: 87 },
-  criticalAlerts: 17
+// Fallback demo stats
+const initialStats = {
+  roads: { total: 14, open: 8, risky: 3, blocked: 3 },
+  vehicles: { total: 10, moving: 6, delayed: 3 },
+  incidents: { total: 8, active: 6 },
+  deliveries: { total: 12, delayed: 4, inTransit: 7 },
+  criticalAlerts: 3
 };
 
-const demoAlerts = [
-  { alertId: 'ALT-0001', severity: 'Critical', title: 'NH-6 Aizawl-Silchar Road Blocked', message: 'Road completely blocked due to landslide. 3 vehicles stranded.', createdAt: new Date(Date.now() - 1800000) },
-  { alertId: 'ALT-0003', severity: 'Warning', title: 'Heavy Rainfall Alert - Meghalaya', message: 'Heavy to very heavy rainfall (150-200mm) expected in East Khasi Hills.', createdAt: new Date(Date.now() - 3600000) },
-  { alertId: 'ALT-0005', severity: 'Warning', title: 'Medicine Delivery NER-105 At Risk', message: 'Critical medicine delivery delayed due to landslide on NH-10.', createdAt: new Date(Date.now() - 7200000) },
-  { alertId: 'ALT-0006', severity: 'Critical', title: 'Food Supply to Aizawl Critically Delayed', message: 'Essential food delivery delayed by 6 hours. Road blocked on NH-6.', createdAt: new Date(Date.now() - 10800000) },
-];
-
-const demoDeliveries = [
-  { deliveryId: 'DEL-0001', cargo: 'Medicines', destination: { name: 'Shillong Civil Hospital' }, priority: 'Critical', status: 'In Transit', delay: 45, vehicleId: 'NER-101' },
-  { deliveryId: 'DEL-0005', cargo: 'Medicines', destination: { name: 'Gangtok Health Center' }, priority: 'Critical', status: 'At Risk', delay: 90, vehicleId: 'NER-105' },
-  { deliveryId: 'DEL-0008', cargo: 'Food', destination: { name: 'Aizawl Central Warehouse' }, priority: 'Critical', status: 'Delayed', delay: 360, vehicleId: 'NER-108' },
-  { deliveryId: 'DEL-0003', cargo: 'Emergency', destination: { name: 'Churachandpur Hospital' }, priority: 'Critical', status: 'In Transit', delay: 0, vehicleId: 'NER-103' },
-];
-
-const demoInsights = [
-  { icon: '🌧️', text: 'Heavy rainfall is increasing disruption risk on 4 major corridors in Meghalaya and Mizoram.' },
-  { icon: '🚛', text: '12 vehicles may experience delays due to current road conditions on NH-2 and NH-39.' },
-  { icon: '💊', text: 'Medicine delivery NER-105 should be redirected through alternate route via Rangpo bypass.' },
-  { icon: '⚠️', text: 'Kohima district may become difficult to access if rainfall continues for next 24 hours.' },
-  { icon: '🌊', text: 'Brahmaputra water level at Tezpur is above danger mark. Flood risk increasing for Sonitpur district.' },
+const initialDistricts = [
+  { name: 'Kamrup Metro', state: 'Assam', accessibilityScore: 92, openRoads: 3, riskyRoads: 0, blockedRoads: 0, riskLevel: 'Low' },
+  { name: 'East Khasi Hills', state: 'Meghalaya', accessibilityScore: 72, openRoads: 2, riskyRoads: 1, blockedRoads: 0, riskLevel: 'Medium' },
+  { name: 'Imphal West', state: 'Manipur', accessibilityScore: 68, openRoads: 1, riskyRoads: 1, blockedRoads: 1, riskLevel: 'High' },
+  { name: 'Aizawl', state: 'Mizoram', accessibilityScore: 50, openRoads: 0, riskyRoads: 0, blockedRoads: 1, riskLevel: 'Critical' },
+  { name: 'Kohima', state: 'Nagaland', accessibilityScore: 50, openRoads: 0, riskyRoads: 1, blockedRoads: 1, riskLevel: 'Critical' },
+  { name: 'East Sikkim', state: 'Sikkim', accessibilityScore: 65, openRoads: 1, riskyRoads: 1, blockedRoads: 0, riskLevel: 'Medium' },
 ];
 
 function timeAgo(date) {
   const mins = Math.floor((Date.now() - new Date(date)) / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return `${Math.max(1, mins)}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-export default function Dashboard() {
-  const [stats, setStats] = useState(demoStats);
-  const [alerts, setAlerts] = useState(demoAlerts);
-  const [criticalDeliveries, setCriticalDeliveries] = useState(demoDeliveries);
+export default function Dashboard({ user }) {
+  const [stats, setStats] = useState(initialStats);
+  const [alerts, setAlerts] = useState([]);
+  const [criticalDeliveries, setCriticalDeliveries] = useState([]);
+  const [districts, setDistricts] = useState(initialDistricts);
+  const [insights, setInsights] = useState([]);
+  const [blockedRoads, setBlockedRoads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [currentLang, setCurrentLang] = useState(localStorage.getItem('ner_lang') || 'en');
+
+  const fetchDashboardData = async () => {
+    try {
+      const [overviewRes, alertsRes, deliveriesRes, insightsRes, districtsRes, roadsRes] = await Promise.allSettled([
+        analyticsAPI.getOverview(),
+        alertsAPI.getAll({ severity: 'Critical' }),
+        deliveriesAPI.getAll({ priority: 'Critical' }),
+        analyticsAPI.getInsights(),
+        districtsAPI.getAll(),
+        roadsAPI.getAll({ status: 'Blocked' })
+      ]);
+
+      if (overviewRes.status === 'fulfilled' && overviewRes.value?.data) {
+        setStats(overviewRes.value.data);
+      }
+      if (alertsRes.status === 'fulfilled' && alertsRes.value?.data) {
+        setAlerts(alertsRes.value.data.slice(0, 5));
+      }
+      if (deliveriesRes.status === 'fulfilled' && deliveriesRes.value?.data) {
+        setCriticalDeliveries(deliveriesRes.value.data.slice(0, 6));
+      }
+      if (insightsRes.status === 'fulfilled' && insightsRes.value?.data) {
+        setInsights(insightsRes.value.data);
+      }
+      if (districtsRes.status === 'fulfilled' && districtsRes.value?.data?.length) {
+        setDistricts(districtsRes.value.data.slice(0, 6));
+      }
+      if (roadsRes.status === 'fulfilled' && roadsRes.value?.data) {
+        setBlockedRoads(roadsRes.value.data);
+      }
+    } catch (e) {
+      console.warn('Dashboard live fetch fallback:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [overviewRes, alertsRes, deliveriesRes] = await Promise.all([
-          analyticsAPI.getOverview(),
-          alertsAPI.getAll({ severity: 'Critical' }),
-          deliveriesAPI.getAll({ priority: 'Critical' })
-        ]);
-        if (overviewRes?.data) setStats(overviewRes.data);
-        if (alertsRes?.data) setAlerts(alertsRes.data.slice(0, 5));
-        if (deliveriesRes?.data) setCriticalDeliveries(deliveriesRes.data.filter(d => d.status !== 'Delivered').slice(0, 5));
-      } catch (e) {
-        // Use demo data on error
-      }
+    fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 10000); // 10s live sync
+
+    const onLang = (e) => setCurrentLang(e.detail);
+    window.addEventListener('ner_language_changed', onLang);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('ner_language_changed', onLang);
     };
-    fetchData();
   }, []);
 
   const statCards = [
-    { label: 'Roads Monitored', value: stats.roads.total.toLocaleString(), icon: FiMapPin, color: 'blue' },
-    { label: 'Open Roads', value: stats.roads.open.toLocaleString(), icon: FiCheckCircle, color: 'green' },
-    { label: 'Risky Roads', value: stats.roads.risky.toLocaleString(), icon: FiAlertTriangle, color: 'yellow' },
-    { label: 'Blocked Roads', value: stats.roads.blocked.toLocaleString(), icon: FiXCircle, color: 'red' },
-    { label: 'Active Vehicles', value: stats.vehicles.total.toLocaleString(), icon: FiTruck, color: 'blue' },
-    { label: 'Delayed Deliveries', value: stats.deliveries.delayed.toLocaleString(), icon: FiClock, color: 'yellow' },
-    { label: 'Critical Alerts', value: String(stats.criticalAlerts), icon: FiBell, color: 'red' },
-    { label: 'Active Incidents', value: stats.incidents.active.toLocaleString(), icon: FiAlertOctagon, color: 'red' },
+    { label: getTranslation('roadsMonitored', currentLang), value: stats.roads.total, icon: FiMapPin, color: 'blue' },
+    { label: getTranslation('openRoads', currentLang), value: stats.roads.open, icon: FiCheckCircle, color: 'green' },
+    { label: getTranslation('riskyRoads', currentLang), value: stats.roads.risky, icon: FiAlertTriangle, color: 'yellow' },
+    { label: getTranslation('blockedRoads', currentLang), value: stats.roads.blocked, icon: FiXCircle, color: 'red' },
+    { label: getTranslation('activeVehicles', currentLang), value: stats.vehicles.total, icon: FiTruck, color: 'blue' },
+    { label: getTranslation('delayedDeliveries', currentLang), value: stats.deliveries.delayed, icon: FiClock, color: 'yellow' },
+    { label: getTranslation('criticalAlerts', currentLang), value: stats.criticalAlerts, icon: FiBell, color: 'red' },
+    { label: getTranslation('activeIncidents', currentLang), value: stats.incidents.active, icon: FiAlertOctagon, color: 'red' },
   ];
 
   return (
     <div>
-      {/* Stat Cards */}
+      {/* 8 Situation Stat Cards */}
       <div className="stat-cards">
         {statCards.map(card => (
           <div className="stat-card" key={card.label}>
@@ -94,63 +117,166 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Map + AI Insights */}
+      {/* Map + Dynamic AI Logistics Intelligence */}
       <div className="grid-2-1" style={{ marginBottom: 24 }}>
         <div className="card">
           <div className="card-header">
-            <h3>🗺️ Regional Overview</h3>
-            <Link to="/map" className="card-action">Full Map →</Link>
+            <h3>🗺️ Live Geographical Infrastructure Map</h3>
+            <Link to="/map" className="card-action">Full GIS Map →</Link>
           </div>
           <DashboardMap />
         </div>
 
         <div className="card">
           <div className="card-header">
-            <h3>🤖 AI Intelligence Insights</h3>
-            <span className="badge-status info" style={{ fontSize: 11 }}>Live</span>
+            <h3>🤖 {getTranslation('aiInsights', currentLang)}</h3>
+            <span className="badge-status info" style={{ fontSize: 11 }}>Active Multi-Factor Inference</span>
           </div>
-          {demoInsights.map((insight, i) => (
-            <div className="insight-card" key={i}>
-              <span className="insight-icon">{insight.icon}</span>
-              <p>{insight.text}</p>
-            </div>
-          ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {insights.length === 0 ? (
+              <div style={{ padding: 16, color: '#64748b', fontSize: 13, textAlign: 'center' }}>
+                Loading live AI intelligence...
+              </div>
+            ) : (
+              insights.map((insight, i) => (
+                <div className="insight-card" key={i} style={{ borderLeft: '4px solid var(--primary)' }}>
+                  <span className="insight-icon" style={{ fontSize: 20 }}>{insight.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: 2 }}>
+                      {insight.type}
+                    </div>
+                    <p style={{ margin: 0, fontSize: 13, color: '#1e293b', lineHeight: 1.4 }}>
+                      {insight.text}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Recent Alerts + Critical Deliveries */}
-      <div className="grid-2">
+      {/* District Connectivity Matrix + Logistics Bottlenecks (Requirement 10) */}
+      <div className="grid-2" style={{ marginBottom: 24 }}>
+        {/* District-wise Connectivity Table */}
         <div className="card">
           <div className="card-header">
-            <h3>🚨 Recent Alerts</h3>
-            <Link to="/alerts" className="card-action">View All →</Link>
-          </div>
-          {alerts.map(alert => (
-            <div className={`alert-item ${alert.severity?.toLowerCase()}`} key={alert.alertId}>
-              <span className="alert-icon">
-                {alert.severity === 'Critical' ? '🔴' : alert.severity === 'Warning' ? '🟡' : 'ℹ️'}
-              </span>
-              <div className="alert-content">
-                <h4>{alert.title}</h4>
-                <p>{alert.message}</p>
-              </div>
-              <span className="alert-time">{timeAgo(alert.createdAt)}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <h3>🚑 Critical Deliveries</h3>
-            <Link to="/logistics" className="card-action">View All →</Link>
+            <h3>🏘️ {getTranslation('districtConnectivity', currentLang)}</h3>
+            <Link to="/settings" className="card-action">All Districts →</Link>
           </div>
           <div className="data-table-wrapper">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Delivery</th>
+                  <th>District</th>
+                  <th>Accessibility</th>
+                  <th>Open</th>
+                  <th>Risky</th>
+                  <th>Blocked</th>
+                  <th>Risk Level</th>
+                </tr>
+              </thead>
+              <tbody>
+                {districts.map(d => (
+                  <tr key={d.name}>
+                    <td><strong>{d.name}</strong> <span style={{ fontSize: 11, color: '#94a3b8' }}>({d.state})</span></td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 45, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${d.accessibilityScore || 70}%`,
+                            height: '100%',
+                            background: (d.accessibilityScore || 70) >= 75 ? '#059669' : (d.accessibilityScore || 70) >= 60 ? '#d97706' : '#dc2626'
+                          }} />
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 700 }}>{d.accessibilityScore || 70}%</span>
+                      </div>
+                    </td>
+                    <td><span style={{ color: '#059669', fontWeight: 600 }}>{d.openRoads ?? 0}</span></td>
+                    <td><span style={{ color: '#d97706', fontWeight: 600 }}>{d.riskyRoads ?? 0}</span></td>
+                    <td><span style={{ color: '#dc2626', fontWeight: 600 }}>{d.blockedRoads ?? 0}</span></td>
+                    <td>
+                      <span className={`badge-status ${(d.riskLevel || 'Medium').toLowerCase()}`}>
+                        {d.riskLevel || 'Medium'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Emergency Routes & Active Bypass Recommendations (Requirement 10 & C) */}
+        <div className="card">
+          <div className="card-header">
+            <h3>🚨 {getTranslation('emergencyRoutes', currentLang)}</h3>
+            <Link to="/routes" className="card-action">Route Engine →</Link>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{
+              background: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: 8,
+              padding: 14
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontWeight: 700, color: '#991b1b', fontSize: 13.5 }}>
+                  🔴 NH-2 Imphal-Dimapur Highway (BLOCKED)
+                </span>
+                <span className="badge-status critical" style={{ fontSize: 10 }}>Landslide Hazard</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: '#7f1d1d', marginBottom: 8 }}>
+                <strong>Recommended Alternative:</strong> NH-44 Bypass via Nongpoh Valley Connector
+              </div>
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#475569', background: '#fff', padding: '6px 10px', borderRadius: 6 }}>
+                <span><strong>Extra Distance:</strong> +27 km</span>
+                <span><strong>Additional Time:</strong> +42 minutes</span>
+                <span><strong>Safety Score:</strong> 94%</span>
+              </div>
+            </div>
+
+            <div style={{
+              background: '#fffbeb',
+              border: '1px solid #fef3c7',
+              borderRadius: 8,
+              padding: 14
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontWeight: 700, color: '#92400e', fontSize: 13.5 }}>
+                  🟡 NH-10 Gangtok-Siliguri Highway (HIGH RISK)
+                </span>
+                <span className="badge-status warning" style={{ fontSize: 10 }}>Soil Saturation</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: '#78350f', marginBottom: 8 }}>
+                <strong>Recommended Alternative:</strong> Rangpo Valley Secondary Connector
+              </div>
+              <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#475569', background: '#fff', padding: '6px 10px', borderRadius: 6 }}>
+                <span><strong>Extra Distance:</strong> +18 km</span>
+                <span><strong>Additional Time:</strong> +25 minutes</span>
+                <span><strong>Safety Score:</strong> 88%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Critical Deliveries + Live Emergency Alerts */}
+      <div className="grid-2">
+        {/* Critical Deliveries Real-Time Table */}
+        <div className="card">
+          <div className="card-header">
+            <h3>🚑 Critical Essential Consignments</h3>
+            <Link to="/logistics" className="card-action">Fleet Grid →</Link>
+          </div>
+          <div className="data-table-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
                   <th>Cargo</th>
                   <th>Destination</th>
+                  <th>Vehicle</th>
                   <th>Status</th>
                   <th>Delay</th>
                 </tr>
@@ -159,20 +285,54 @@ export default function Dashboard() {
                 {criticalDeliveries.map(del => (
                   <tr key={del.deliveryId}>
                     <td><strong>{del.deliveryId}</strong></td>
-                    <td>{del.cargo}</td>
-                    <td>{del.destination?.name}</td>
+                    <td>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {del.cargo === 'Medicines' ? '💊' : del.cargo === 'Food' ? '🌾' : del.cargo === 'Fuel' ? '⛽' : '📦'}
+                        {del.cargo}
+                      </span>
+                    </td>
+                    <td>{del.destination?.name || 'NER District Depot'}</td>
+                    <td><span className="badge-status info" style={{ fontSize: 11 }}>{del.vehicleId}</span></td>
                     <td>
                       <span className={`badge-status ${del.status?.toLowerCase().replace(' ', '-')}`}>
                         {del.status}
                       </span>
                     </td>
-                    <td style={{ color: del.delay > 0 ? '#dc2626' : '#059669', fontWeight: 600 }}>
-                      {del.delay > 0 ? `+${del.delay}m` : 'On Time'}
+                    <td style={{ color: del.delay > 0 ? '#dc2626' : '#059669', fontWeight: 700 }}>
+                      {del.delay > 0 ? `+${del.delay}m` : 'On Schedule'}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+
+        {/* Live Emergency Alerts */}
+        <div className="card">
+          <div className="card-header">
+            <h3>🚨 {getTranslation('criticalAlerts', currentLang)}</h3>
+            <Link to="/alerts" className="card-action">All Alerts →</Link>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {alerts.length === 0 ? (
+              <div style={{ padding: 16, color: '#94a3b8', textAlign: 'center', fontSize: 13 }}>
+                ✅ All corridors clear. No critical alerts currently active.
+              </div>
+            ) : (
+              alerts.map(alert => (
+                <div className={`alert-item ${alert.severity?.toLowerCase()}`} key={alert.alertId}>
+                  <span className="alert-icon">
+                    {alert.severity === 'Critical' ? '🔴' : '🟡'}
+                  </span>
+                  <div className="alert-content">
+                    <h4>{alert.title}</h4>
+                    <p>{alert.message}</p>
+                  </div>
+                  <span className="alert-time">{timeAgo(alert.createdAt)}</span>
+                </div>
+              ))
+            )}
           </div>
         </div>
       </div>

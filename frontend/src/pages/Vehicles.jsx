@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { FiTruck, FiMapPin, FiClock, FiActivity, FiNavigation, FiCheck } from 'react-icons/fi';
+import { FiTruck, FiMapPin, FiClock, FiActivity, FiNavigation, FiCheck, FiSearch, FiPlus, FiX } from 'react-icons/fi';
 import { vehiclesAPI } from '../services/api';
 
 const demoVehicles = [
@@ -22,9 +22,24 @@ const priorityStyle = (p) => p === 'Critical' ? { color: '#dc2626', fontWeight: 
 
 export default function Vehicles({ user }) {
   const [vehicles, setVehicles] = useState(demoVehicles);
-  const [filter, setFilter] = useState({ status: '', cargo: '' });
+  const [filter, setFilter] = useState({ status: '', cargo: '', search: '' });
   const [notice, setNotice] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newVehicle, setNewVehicle] = useState({
+    vehicleId: '',
+    registrationNumber: '',
+    type: 'Truck',
+    driverName: '',
+    driverPhone: '',
+    cargo: 'Medicines',
+    cargoPriority: 'Critical',
+    origin: 'Guwahati',
+    destination: 'Shillong',
+    fuelLevel: 85
+  });
+
   const isDriver = user?.role === 'driver';
+  const isAdmin = user?.role === 'admin';
 
   // Driver Telemetry Form State
   const [myVehicle, setMyVehicle] = useState(demoVehicles[0]);
@@ -35,12 +50,17 @@ export default function Vehicles({ user }) {
   const [driverStatus, setDriverStatus] = useState('Moving');
   const [updating, setUpdating] = useState(false);
 
-  useEffect(() => {
+  const fetchVehicles = () => {
     vehiclesAPI.getAll().then(res => {
       if (res?.data?.length) {
         setVehicles(res.data);
       }
     }).catch(() => {});
+  };
+
+  useEffect(() => {
+    fetchVehicles();
+    const interval = setInterval(fetchVehicles, 8000); // 8s live polling
 
     if (isDriver) {
       vehiclesAPI.getMyVehicle().then(res => {
@@ -53,10 +73,11 @@ export default function Vehicles({ user }) {
           setDriverStatus(res.data.status || 'Moving');
         }
       }).catch(() => {
-        // Fallback default driver vehicle
         setMyVehicle(demoVehicles[0]);
       });
     }
+
+    return () => clearInterval(interval);
   }, [user]);
 
   const handleUseCurrentLocation = () => {
@@ -69,7 +90,6 @@ export default function Vehicles({ user }) {
           setTimeout(() => setNotice(''), 4000);
         },
         () => {
-          // Fallback realistic NER GPS
           setDriverLat(25.5788);
           setDriverLng(91.8933);
           setNotice('📍 Captured coordinates near Shillong corridor (25.5788° N, 91.8933° E)');
@@ -118,9 +138,59 @@ export default function Vehicles({ user }) {
     }
   };
 
+  const handleCreateVehicle = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        vehicleId: newVehicle.vehicleId || `NER-${vehicles.length + 101}`,
+        registrationNumber: newVehicle.registrationNumber || `AS-01-XY-${Math.floor(1000 + Math.random() * 9000)}`,
+        type: newVehicle.type,
+        driver: { name: newVehicle.driverName, phone: newVehicle.driverPhone },
+        cargo: newVehicle.cargo,
+        cargoPriority: newVehicle.cargoPriority,
+        origin: { name: newVehicle.origin },
+        destination: { name: newVehicle.destination },
+        currentLocation: { lat: 26.14, lng: 91.73, address: newVehicle.origin },
+        fuelLevel: Number(newVehicle.fuelLevel) || 85,
+        status: 'Moving',
+        currentSpeed: 40
+      };
+
+      const res = await vehiclesAPI.create(payload);
+      const created = res?.data || payload;
+
+      setVehicles([created, ...vehicles]);
+      setNotice(`✅ Vehicle ${created.vehicleId} added to operational fleet.`);
+      setShowAddModal(false);
+      setNewVehicle({
+        vehicleId: '',
+        registrationNumber: '',
+        type: 'Truck',
+        driverName: '',
+        driverPhone: '',
+        cargo: 'Medicines',
+        cargoPriority: 'Critical',
+        origin: 'Guwahati',
+        destination: 'Shillong',
+        fuelLevel: 85
+      });
+      setTimeout(() => setNotice(''), 5000);
+    } catch (err) {
+      setNotice(`❌ Error creating vehicle: ${err.message}`);
+      setTimeout(() => setNotice(''), 5000);
+    }
+  };
+
   const filtered = vehicles.filter(v => {
     if (filter.status && v.status !== filter.status) return false;
     if (filter.cargo && v.cargo !== filter.cargo) return false;
+    if (filter.search) {
+      const q = filter.search.toLowerCase();
+      const vId = (v.vehicleId || '').toLowerCase();
+      const dName = (typeof v.driver === 'object' ? v.driver?.name : v.driver || '').toLowerCase();
+      const reg = (v.registrationNumber || '').toLowerCase();
+      if (!vId.includes(q) && !dName.includes(q) && !reg.includes(q)) return false;
+    }
     return true;
   });
 
@@ -261,26 +331,101 @@ export default function Vehicles({ user }) {
       <div className="page-header">
         <div>
           <h2>{isDriver ? 'Fleet Overview' : 'Vehicle Tracking & Fleet Telemetry'}</h2>
-          <p>Real-time location, speed, fuel, and consignment status</p>
+          <p>Real-time location, speed, fuel, and consignment tracking across NER</p>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {isAdmin && (
+            <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
+              <FiPlus /> Register Vehicle
+            </button>
+          )}
           <span className="badge-status info">{vehicles.filter(v => v.status === 'Moving').length} Moving</span>
           <span className="badge-status warning">{vehicles.filter(v => v.status === 'Delayed' || v.status === 'Stopped').length} Delayed/Stopped</span>
           <span className="badge-status critical">{vehicles.filter(v => v.status === 'At Risk').length} At Risk</span>
         </div>
       </div>
 
-      {/* Filters Bar */}
-      <div className="filters-bar">
+      {/* Add Vehicle Modal (Admin Only) */}
+      {showAddModal && isAdmin && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.6)', zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16
+        }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 24, maxWidth: 500, width: '100%' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 16, fontWeight: 700 }}>Register New Fleet Vehicle</h3>
+              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><FiX size={18} /></button>
+            </div>
+            <form onSubmit={handleCreateVehicle}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>Vehicle ID</label>
+                  <input className="form-control" placeholder="e.g. NER-111" value={newVehicle.vehicleId} onChange={e => setNewVehicle({ ...newVehicle, vehicleId: e.target.value })} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>Registration No.</label>
+                  <input className="form-control" placeholder="e.g. AS-01-EF-7890" value={newVehicle.registrationNumber} onChange={e => setNewVehicle({ ...newVehicle, registrationNumber: e.target.value })} required />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>Driver Name</label>
+                  <input className="form-control" placeholder="Assigned Driver" value={newVehicle.driverName} onChange={e => setNewVehicle({ ...newVehicle, driverName: e.target.value })} required />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>Cargo Type</label>
+                  <select className="form-control" value={newVehicle.cargo} onChange={e => setNewVehicle({ ...newVehicle, cargo: e.target.value })}>
+                    {['Medicines', 'Food', 'Agricultural', 'Construction', 'Emergency', 'Fuel', 'General'].map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 18 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>Priority</label>
+                  <select className="form-control" value={newVehicle.cargoPriority} onChange={e => setNewVehicle({ ...newVehicle, cargoPriority: e.target.value })}>
+                    {['Critical', 'High', 'Medium', 'Low'].map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600 }}>Destination</label>
+                  <input className="form-control" placeholder="Destination Depot" value={newVehicle.destination} onChange={e => setNewVehicle({ ...newVehicle, destination: e.target.value })} required />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setShowAddModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">Save Vehicle</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Search & Filters Bar (Requirement 27) */}
+      <div className="filters-bar" style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 10px', flex: '1 1 200px' }}>
+          <FiSearch size={14} color="#64748b" />
+          <input
+            type="text"
+            placeholder="Search by Vehicle ID, Driver, or Reg. No..."
+            value={filter.search}
+            onChange={e => setFilter({ ...filter, search: e.target.value })}
+            style={{ border: 'none', outline: 'none', fontSize: 13, width: '100%' }}
+          />
+        </div>
+
         <select className="filter-select" value={filter.status} onChange={e => setFilter({ ...filter, status: e.target.value })}>
-          <option value="">All Status</option>
+          <option value="">All Statuses</option>
           <option value="Moving">Moving</option>
           <option value="Stopped">Stopped</option>
           <option value="Delayed">Delayed</option>
           <option value="At Risk">At Risk</option>
         </select>
         <select className="filter-select" value={filter.cargo} onChange={e => setFilter({ ...filter, cargo: e.target.value })}>
-          <option value="">All Cargo</option>
+          <option value="">All Cargo Commodities</option>
           {['Medicines', 'Food', 'Emergency', 'Construction', 'Agricultural', 'Fuel', 'General'].map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
@@ -288,71 +433,77 @@ export default function Vehicles({ user }) {
       {/* Vehicles Table */}
       <div className="card">
         <div className="data-table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Vehicle ID</th>
-                <th>Type</th>
-                <th>Driver</th>
-                <th>Cargo</th>
-                <th>Priority</th>
-                <th>From → To</th>
-                <th>Status</th>
-                <th>Speed</th>
-                <th>Fuel</th>
-                <th>Trip Progress</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(v => (
-                <tr key={v.vehicleId} style={{ background: isDriver && v.vehicleId === myVehicle.vehicleId ? '#eff6ff' : '' }}>
-                  <td>
-                    <strong>{v.vehicleId}</strong>
-                    {isDriver && v.vehicleId === myVehicle.vehicleId && (
-                      <span style={{ marginLeft: 6, fontSize: 10, background: '#3b82f6', color: '#fff', padding: '2px 6px', borderRadius: 4 }}>
-                        MY TRUCK
-                      </span>
-                    )}
-                    <br/>
-                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{v.registrationNumber}</span>
-                  </td>
-                  <td>{v.type}</td>
-                  <td>{typeof v.driver === 'object' ? v.driver?.name : v.driver}</td>
-                  <td>{v.cargo}</td>
-                  <td style={priorityStyle(v.cargoPriority)}>{v.cargoPriority}</td>
-                  <td>{v.origin?.name || v.origin} → {v.destination?.name || v.destination}</td>
-                  <td>{statusBadge(v.status)}</td>
-                  <td><strong>{v.currentSpeed} km/h</strong></td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 50, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{
-                          width: `${v.fuelLevel}%`,
-                          height: '100%',
-                          background: v.fuelLevel < 30 ? '#dc2626' : v.fuelLevel < 50 ? '#d97706' : '#059669',
-                          borderRadius: 3
-                        }}></div>
-                      </div>
-                      <span style={{ fontSize: 12, fontWeight: 600 }}>{v.fuelLevel}%</span>
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <div style={{ width: 60, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{
-                          width: `${Math.round((v.distanceCovered / (v.totalDistance || 100)) * 100)}%`,
-                          height: '100%',
-                          background: '#3b82f6',
-                          borderRadius: 3
-                        }}></div>
-                      </div>
-                      <span style={{ fontSize: 11 }}>{v.distanceCovered}/{v.totalDistance}km</span>
-                    </div>
-                  </td>
+          {filtered.length === 0 ? (
+            <div style={{ padding: '32px 16px', textAlign: 'center', color: '#64748b' }}>
+              No vehicles matched your search filter.
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Vehicle ID</th>
+                  <th>Type</th>
+                  <th>Driver</th>
+                  <th>Cargo</th>
+                  <th>Priority</th>
+                  <th>From → To</th>
+                  <th>Status</th>
+                  <th>Speed</th>
+                  <th>Fuel</th>
+                  <th>Trip Progress</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map(v => (
+                  <tr key={v.vehicleId} style={{ background: isDriver && v.vehicleId === myVehicle.vehicleId ? '#eff6ff' : '' }}>
+                    <td>
+                      <strong>{v.vehicleId}</strong>
+                      {isDriver && v.vehicleId === myVehicle.vehicleId && (
+                        <span style={{ marginLeft: 6, fontSize: 10, background: '#3b82f6', color: '#fff', padding: '2px 6px', borderRadius: 4 }}>
+                          MY TRUCK
+                        </span>
+                      )}
+                      <br/>
+                      <span style={{ fontSize: 11, color: '#94a3b8' }}>{v.registrationNumber}</span>
+                    </td>
+                    <td>{v.type}</td>
+                    <td>{typeof v.driver === 'object' ? v.driver?.name : v.driver}</td>
+                    <td>{v.cargo}</td>
+                    <td style={priorityStyle(v.cargoPriority)}>{v.cargoPriority}</td>
+                    <td>{v.origin?.name || v.origin} → {v.destination?.name || v.destination}</td>
+                    <td>{statusBadge(v.status)}</td>
+                    <td><strong>{v.currentSpeed} km/h</strong></td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 50, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${v.fuelLevel}%`,
+                            height: '100%',
+                            background: v.fuelLevel < 30 ? '#dc2626' : v.fuelLevel < 50 ? '#d97706' : '#059669',
+                            borderRadius: 3
+                          }}></div>
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600 }}>{v.fuelLevel}%</span>
+                      </div>
+                    </td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <div style={{ width: 60, height: 6, background: '#e2e8f0', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{
+                            width: `${Math.round((v.distanceCovered / (v.totalDistance || 100)) * 100)}%`,
+                            height: '100%',
+                            background: '#3b82f6',
+                            borderRadius: 3
+                          }}></div>
+                        </div>
+                        <span style={{ fontSize: 11 }}>{v.distanceCovered}/{v.totalDistance}km</span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

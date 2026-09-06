@@ -11,43 +11,35 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-const createIcon = (emoji, size = 28) => L.divIcon({
-  html: `<div style="font-size:${size}px;text-align:center;line-height:1">${emoji}</div>`,
+const createIcon = (emoji, size = 26) => L.divIcon({
+  html: `<div style="font-size:${size}px;text-align:center;line-height:1;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">${emoji}</div>`,
   className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2],
 });
 
+const ROAD_COORDINATES = {
+  'NH-27-01': [[26.1445, 91.7362], [25.88, 91.86], [25.5788, 91.8933]],
+  'NH-37-01': [[26.1445, 91.7362], [26.3, 92.5], [25.9065, 93.7272]],
+  'NH-02-MN': [[24.8170, 93.9368], [25.3, 93.82], [25.9065, 93.7272]],
+  'NH-06-MZ': [[23.7271, 92.7176], [24.2, 92.75], [24.8333, 92.7789]],
+  'NH-10-SK': [[27.3389, 88.6065], [27.0, 88.5], [26.7271, 88.3953]],
+  'SH-01-ML': [[25.5788, 91.8933], [25.38, 91.95], [25.1873, 92.0238]],
+  'SH-02-TR': [[23.8315, 91.2868], [23.68, 91.38], [23.5333, 91.4833]],
+  'NH-39-NL': [[25.6586, 94.1086], [25.2, 94.0], [24.8170, 93.9368]],
+  'SH-03-WG': [[25.5166, 90.2223], [25.37, 90.20], [25.2250, 90.1766]],
+  'NH-15-AS': [[26.6800, 92.9800], [26.4, 92.2], [26.1445, 91.7362]],
+  'NH-29-AS': [[27.4889, 95.3547], [27.52, 95.45], [27.5697, 95.5719]],
+  'BR-01-KAM': [[26.2000, 91.7200], [26.1700, 91.7300]],
+  'DR-01-RB': [[25.8800, 91.8600], [25.77, 91.87], [25.6700, 91.8800]],
+  'DR-02-DIM': [[25.9065, 93.7272], [25.75, 93.9], [25.6586, 94.1086]],
+};
+
 const initialRoads = [
-  { id: 'NH-27-01', roadId: 'NH-27-01', name: 'NH-27 Guwahati-Shillong Highway', points: [[26.1445, 91.7362], [25.88, 91.86], [25.5788, 91.8933]], status: 'Open', risk: 'Medium', traffic: 'Heavy', disruption: 42, rainfall: 45 },
-  { id: 'NH-37-01', roadId: 'NH-37-01', name: 'NH-37 Guwahati-Dimapur', points: [[26.1445, 91.7362], [26.3, 92.5], [25.9065, 93.7272]], status: 'Open', risk: 'Low', traffic: 'Moderate', disruption: 18, rainfall: 30 },
-  { id: 'NH-02-MN', roadId: 'NH-02-MN', name: 'NH-2 Imphal-Dimapur Highway', points: [[24.8170, 93.9368], [25.3, 93.82], [25.9065, 93.7272]], status: 'Risky', risk: 'High', traffic: 'Heavy', disruption: 78, rainfall: 95 },
-  { id: 'NH-06-MZ', roadId: 'NH-06-MZ', name: 'NH-6 Aizawl-Silchar Road', points: [[23.7271, 92.7176], [24.2, 92.75], [24.8333, 92.7789]], status: 'Blocked', risk: 'Critical', traffic: 'Standstill', disruption: 95, rainfall: 145 },
-  { id: 'NH-10-SK', roadId: 'NH-10-SK', name: 'NH-10 Gangtok-Siliguri Highway', points: [[27.3389, 88.6065], [27.0, 88.5], [26.7271, 88.3953]], status: 'Risky', risk: 'High', traffic: 'Heavy', disruption: 65, rainfall: 95 },
-  { id: 'SH-01-ML', roadId: 'SH-01-ML', name: 'Shillong-Dawki Road', points: [[25.5788, 91.8933], [25.38, 91.95], [25.1873, 92.0238]], status: 'Open', risk: 'Medium', traffic: 'Moderate', disruption: 35, rainfall: 80 },
-  { id: 'SH-02-TR', roadId: 'SH-02-TR', name: 'Agartala-Udaipur Road', points: [[23.8315, 91.2868], [23.68, 91.38], [23.5333, 91.4833]], status: 'Open', risk: 'Low', traffic: 'Low', disruption: 12, rainfall: 15 },
-  { id: 'NH-39-NL', roadId: 'NH-39-NL', name: 'NH-39 Kohima-Imphal', points: [[25.6586, 94.1086], [25.2, 94.0], [24.8170, 93.9368]], status: 'Blocked', risk: 'Critical', traffic: 'Standstill', disruption: 92, rainfall: 110 },
-  { id: 'SH-03-WG', roadId: 'SH-03-WG', name: 'Tura-Dalu Road', points: [[25.5166, 90.2223], [25.37, 90.20], [25.2250, 90.1766]], status: 'Risky', risk: 'High', traffic: 'Moderate', disruption: 58, rainfall: 130 },
-  { id: 'NH-15-AS', roadId: 'NH-15-AS', name: 'NH-15 Tezpur Highway', points: [[26.6800, 92.9800], [26.4, 92.2], [26.1445, 91.7362]], status: 'Open', risk: 'Low', traffic: 'Moderate', disruption: 15, rainfall: 70 },
-];
-
-const initialVehicles = [
-  { id: 'NER-101', vehicleId: 'NER-101', lat: 26.12, lng: 91.85, cargo: 'Medicines', status: 'Moving', driver: 'Rajesh Kumar', speed: 35, dest: 'Shillong', priority: 'Critical' },
-  { id: 'NER-102', vehicleId: 'NER-102', lat: 25.65, lng: 91.90, cargo: 'Food', status: 'Moving', driver: 'Bimal Das', speed: 28, dest: 'Tura', priority: 'High' },
-  { id: 'NER-103', vehicleId: 'NER-103', lat: 24.90, lng: 93.88, cargo: 'Emergency', status: 'Moving', driver: 'Tomba Singh', speed: 42, dest: 'Churachandpur', priority: 'Critical' },
-  { id: 'NER-104', vehicleId: 'NER-104', lat: 26.85, lng: 93.50, cargo: 'Construction', status: 'Delayed', driver: 'Abdul Rahman', speed: 0, dest: 'Dimapur', priority: 'Medium' },
-  { id: 'NER-105', vehicleId: 'NER-105', lat: 27.20, lng: 88.55, cargo: 'Medicines', status: 'At Risk', driver: 'Pempa Sherpa', speed: 15, dest: 'Gangtok', priority: 'Critical' },
-  { id: 'NER-106', vehicleId: 'NER-106', lat: 23.78, lng: 91.35, cargo: 'Agricultural', status: 'Moving', driver: 'Subhash Debnath', speed: 38, dest: 'Udaipur', priority: 'Medium' },
-  { id: 'NER-107', vehicleId: 'NER-107', lat: 25.85, lng: 93.80, cargo: 'Fuel', status: 'Stopped', driver: 'Kevi Zhimo', speed: 0, dest: 'Kohima', priority: 'High' },
-  { id: 'NER-108', vehicleId: 'NER-108', lat: 23.80, lng: 92.72, cargo: 'Food', status: 'Delayed', driver: 'Lalthianga', speed: 0, dest: 'Aizawl', priority: 'Critical' },
-];
-
-const initialIncidents = [
-  { id: 'INC-0001', lat: 25.65, lng: 91.88, type: 'Landslide', severity: 'Critical', desc: 'Major landslide blocking NH-27 near Umiam Lake' },
-  { id: 'INC-0002', lat: 26.63, lng: 92.80, type: 'Flood', severity: 'High', desc: 'Brahmaputra water level above danger mark' },
-  { id: 'INC-0003', lat: 25.70, lng: 94.05, type: 'Road Damage', severity: 'Critical', desc: 'Severe road damage on NH-39' },
-  { id: 'INC-0004', lat: 25.90, lng: 91.87, type: 'Bridge Damage', severity: 'Medium', desc: 'Structural cracks in old bridge' },
-  { id: 'INC-0005', lat: 23.75, lng: 92.73, type: 'Weather Hazard', severity: 'Critical', desc: 'Dense fog and heavy rainfall on NH-6' },
-  { id: 'INC-0006', lat: 27.18, lng: 88.53, type: 'Landslide', severity: 'High', desc: 'Minor landslide near Rangpo' },
-  { id: 'INC-0007', lat: 25.91, lng: 93.73, type: 'Heavy Traffic', severity: 'Low', desc: 'Traffic congestion at Dimapur market' },
+  { id: 'NH-27-01', roadId: 'NH-27-01', name: 'NH-27 Guwahati-Shillong Highway', points: ROAD_COORDINATES['NH-27-01'], status: 'Open', risk: 'Medium', traffic: 'Heavy', disruption: 42, rainfall: 45 },
+  { id: 'NH-02-MN', roadId: 'NH-02-MN', name: 'NH-2 Imphal-Dimapur Highway', points: ROAD_COORDINATES['NH-02-MN'], status: 'Risky', risk: 'High', traffic: 'Heavy', disruption: 78, rainfall: 95 },
+  { id: 'NH-06-MZ', roadId: 'NH-06-MZ', name: 'NH-6 Aizawl-Silchar Road', points: ROAD_COORDINATES['NH-06-MZ'], status: 'Blocked', risk: 'Critical', traffic: 'Standstill', disruption: 95, rainfall: 145 },
+  { id: 'NH-10-SK', roadId: 'NH-10-SK', name: 'NH-10 Gangtok-Siliguri Highway', points: ROAD_COORDINATES['NH-10-SK'], status: 'Risky', risk: 'High', traffic: 'Heavy', disruption: 65, rainfall: 95 },
+  { id: 'NH-39-NL', roadId: 'NH-39-NL', name: 'NH-39 Kohima-Imphal', points: ROAD_COORDINATES['NH-39-NL'], status: 'Blocked', risk: 'Critical', traffic: 'Standstill', disruption: 92, rainfall: 110 },
+  { id: 'BR-01-KAM', roadId: 'BR-01-KAM', name: 'Saraighat Bridge', points: ROAD_COORDINATES['BR-01-KAM'], type: 'Bridge', status: 'Open', risk: 'Medium', traffic: 'Heavy', disruption: 30, rainfall: 45 },
 ];
 
 const statusColors = { Open: '#059669', Risky: '#d97706', Blocked: '#dc2626' };
@@ -55,9 +47,9 @@ const severityEmoji = { Critical: '🔴', High: '🟠', Medium: '🟡', Low: '�
 
 export default function LiveMap({ user }) {
   const [roads, setRoads] = useState(initialRoads);
-  const [vehicles, setVehicles] = useState(initialVehicles);
-  const [incidents, setIncidents] = useState(initialIncidents);
-  const [filters, setFilters] = useState({ roads: true, vehicles: true, incidents: true, status: 'All' });
+  const [vehicles, setVehicles] = useState([]);
+  const [incidents, setIncidents] = useState([]);
+  const [filters, setFilters] = useState({ roads: true, vehicles: true, incidents: true, bridges: true, status: 'All' });
   const [notice, setNotice] = useState('');
   const [editingRoad, setEditingRoad] = useState(null);
   const [editStatus, setEditStatus] = useState('Blocked');
@@ -67,31 +59,62 @@ export default function LiveMap({ user }) {
   // Check if role has road modification authority
   const canModifyRoad = ['admin', 'government_official'].includes(user?.role);
 
-  useEffect(() => {
-    roadsAPI.getAll().then(res => {
-      if (res?.data?.length) {
-        setRoads(prev => prev.map(pr => {
-          const matched = res.data.find(r => r.roadId === pr.id || r.roadId === pr.roadId);
-          return matched ? { ...pr, status: matched.status, risk: matched.riskLevel || pr.risk } : pr;
-        }));
-      }
-    }).catch(() => {});
+  const fetchLiveMapData = async () => {
+    try {
+      const [roadsRes, vehiclesRes, incidentsRes] = await Promise.allSettled([
+        roadsAPI.getAll(),
+        vehiclesAPI.getAll(),
+        incidentsAPI.getAll()
+      ]);
 
-    vehiclesAPI.getAll().then(res => {
-      if (res?.data?.length) {
-        setVehicles(prev => prev.map(pv => {
-          const matched = res.data.find(v => v.vehicleId === pv.id || v.vehicleId === pv.vehicleId);
-          return matched ? {
-            ...pv,
-            lat: matched.currentLocation?.lat || pv.lat,
-            lng: matched.currentLocation?.lng || pv.lng,
-            speed: matched.currentSpeed !== undefined ? matched.currentSpeed : pv.speed,
-            fuel: matched.fuelLevel || pv.fuel,
-            status: matched.status || pv.status
-          } : pv;
-        }));
+      if (roadsRes.status === 'fulfilled' && roadsRes.value?.data?.length) {
+        const mappedRoads = roadsRes.value.data.map(r => {
+          let pts = ROAD_COORDINATES[r.roadId] || [];
+          if (!pts.length && r.startPoint?.coordinates && r.endPoint?.coordinates) {
+            pts = [
+              [r.startPoint.coordinates.lat, r.startPoint.coordinates.lng],
+              [r.endPoint.coordinates.lat, r.endPoint.coordinates.lng]
+            ];
+          }
+          return {
+            ...r,
+            id: r.roadId,
+            points: pts,
+            risk: r.riskLevel || 'Low',
+            traffic: r.trafficLevel || 'Moderate',
+            disruption: r.disruptionProbability || 20,
+            rainfall: r.rainfall || 40
+          };
+        }).filter(r => r.points && r.points.length > 0);
+        setRoads(mappedRoads);
       }
-    }).catch(() => {});
+
+      if (vehiclesRes.status === 'fulfilled' && vehiclesRes.value?.data?.length) {
+        const mappedVehicles = vehiclesRes.value.data.map(v => ({
+          ...v,
+          id: v.vehicleId,
+          lat: v.currentLocation?.lat,
+          lng: v.currentLocation?.lng,
+          speed: v.currentSpeed,
+          fuel: v.fuelLevel,
+          priority: v.cargoPriority,
+          dest: v.destination?.name
+        })).filter(v => v.lat && v.lng);
+        setVehicles(mappedVehicles);
+      }
+
+      if (incidentsRes.status === 'fulfilled' && incidentsRes.value?.data?.length) {
+        setIncidents(incidentsRes.value.data.filter(i => i.status !== 'Resolved'));
+      }
+    } catch (e) {
+      console.warn('LiveMap sync fallback:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveMapData();
+    const interval = setInterval(fetchLiveMapData, 10000); // 10s auto-refresh
+    return () => clearInterval(interval);
   }, []);
 
   const handleOpenEditModal = (road) => {
@@ -126,7 +149,12 @@ export default function LiveMap({ user }) {
     }
   };
 
-  const filteredRoads = roads.filter(r => filters.roads && (filters.status === 'All' || r.status === filters.status));
+  const filteredRoads = roads.filter(r => {
+    if (!filters.roads && r.type !== 'Bridge') return false;
+    if (!filters.bridges && r.type === 'Bridge') return false;
+    if (filters.status !== 'All' && r.status !== filters.status) return false;
+    return true;
+  });
 
   return (
     <div>
@@ -223,25 +251,28 @@ export default function LiveMap({ user }) {
       )}
 
       {/* Filters Bar */}
-      <div className="filters-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+      <div className="filters-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+        <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-            <input type="checkbox" checked={filters.roads} onChange={e => setFilters({ ...filters, roads: e.target.checked })} /> Roads
+            <input type="checkbox" checked={filters.roads} onChange={e => setFilters({ ...filters, roads: e.target.checked })} /> Highways
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-            <input type="checkbox" checked={filters.vehicles} onChange={e => setFilters({ ...filters, vehicles: e.target.checked })} /> Vehicles
+            <input type="checkbox" checked={filters.bridges} onChange={e => setFilters({ ...filters, bridges: e.target.checked })} /> 🌉 Bridges
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
-            <input type="checkbox" checked={filters.incidents} onChange={e => setFilters({ ...filters, incidents: e.target.checked })} /> Incidents
+            <input type="checkbox" checked={filters.vehicles} onChange={e => setFilters({ ...filters, vehicles: e.target.checked })} /> 🚚 Vehicles ({vehicles.length})
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+            <input type="checkbox" checked={filters.incidents} onChange={e => setFilters({ ...filters, incidents: e.target.checked })} /> ⚠️ Incidents ({incidents.length})
           </label>
         </div>
 
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           <select className="filter-select" value={filters.status} onChange={e => setFilters({ ...filters, status: e.target.value })}>
-            <option value="All">All Road Status</option>
-            <option value="Open">Open</option>
-            <option value="Risky">Risky</option>
-            <option value="Blocked">Blocked</option>
+            <option value="All">All Road Statuses</option>
+            <option value="Open">🟢 Open</option>
+            <option value="Risky">🟡 Risky</option>
+            <option value="Blocked">🔴 Blocked</option>
           </select>
           {canModifyRoad && (
             <span style={{ fontSize: 12, background: '#eff6ff', color: '#1e40af', padding: '4px 10px', borderRadius: 6, fontWeight: 600 }}>
@@ -252,24 +283,39 @@ export default function LiveMap({ user }) {
       </div>
 
       {/* Full Page Map */}
-      <div className="map-container fullpage">
-        <MapContainer center={[25.5, 92.0]} zoom={7} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
+      <div className="map-container fullpage" style={{ height: 'calc(100vh - 220px)', minHeight: 520, borderRadius: 10, overflow: 'hidden', border: '1px solid #cbd5e1' }}>
+        <MapContainer center={[25.5, 92.5]} zoom={7} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org">OSM</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          {/* Roads */}
+          {/* Roads & Bridges */}
           {filteredRoads.map(road => (
-            <Polyline key={road.id} positions={road.points} color={statusColors[road.status]} weight={6} opacity={0.85}>
+            <Polyline
+              key={road.id || road.roadId}
+              positions={road.points}
+              color={statusColors[road.status] || '#059669'}
+              weight={road.type === 'Bridge' ? 8 : road.status === 'Blocked' ? 6 : 5}
+              opacity={0.88}
+            >
               <Popup>
-                <div className="popup-title">{road.name}</div>
-                <div className="popup-row"><span className="popup-label">Road ID:</span><span className="popup-value">{road.roadId || road.id}</span></div>
-                <div className="popup-row"><span className="popup-label">Status:</span><span className="popup-value" style={{ color: statusColors[road.status], fontWeight: 700 }}>{road.status.toUpperCase()}</span></div>
+                <div className="popup-title">
+                  {road.type === 'Bridge' ? '🌉 ' : '🛣️ '}{road.name}
+                </div>
+                <div className="popup-row"><span className="popup-label">Corridor ID:</span><span className="popup-value">{road.roadId || road.id}</span></div>
+                <div className="popup-row">
+                  <span className="popup-label">Status:</span>
+                  <span className="popup-value" style={{ color: statusColors[road.status], fontWeight: 700 }}>
+                    {road.status.toUpperCase()}
+                  </span>
+                </div>
+                <div className="popup-row"><span className="popup-label">District / State:</span><span className="popup-value">{road.district}, {road.state}</span></div>
                 <div className="popup-row"><span className="popup-label">Risk Level:</span><span className="popup-value">{road.risk}</span></div>
                 <div className="popup-row"><span className="popup-label">Disruption:</span><span className="popup-value">{road.disruption}%</span></div>
-                <div className="popup-row"><span className="popup-label">Traffic:</span><span className="popup-value">{road.traffic}</span></div>
-                <div className="popup-row"><span className="popup-label">Rainfall:</span><span className="popup-value">{road.rainfall} mm</span></div>
+                {road.type === 'Bridge' && (
+                  <div className="popup-row"><span className="popup-label">Bridge Condition:</span><span className="popup-value">{road.bridgeCondition || 'Good'}</span></div>
+                )}
 
                 {/* Edit Button for Admin & Government Official */}
                 {canModifyRoad && (
@@ -289,40 +335,63 @@ export default function LiveMap({ user }) {
 
           {/* Vehicles */}
           {filters.vehicles && vehicles.map(v => (
-            <Marker key={v.id || v.vehicleId} position={[v.lat, v.lng]} icon={createIcon(v.status === 'Delayed' ? '🚛' : v.status === 'At Risk' ? '⚠️' : '🚛')}>
+            <Marker
+              key={v.id || v.vehicleId}
+              position={[v.lat, v.lng]}
+              icon={createIcon(v.status === 'Delayed' ? '🚛' : v.status === 'At Risk' ? '⚠️' : '🚚', 26)}
+            >
               <Popup>
-                <div className="popup-title">{v.id || v.vehicleId}</div>
+                <div className="popup-title" style={{ color: '#0284c7' }}>🚚 {v.id || v.vehicleId}</div>
                 <div className="popup-row"><span className="popup-label">Driver:</span><span className="popup-value">{typeof v.driver === 'object' ? v.driver?.name : v.driver}</span></div>
                 <div className="popup-row"><span className="popup-label">Cargo:</span><span className="popup-value">{v.cargo}</span></div>
                 <div className="popup-row"><span className="popup-label">Priority:</span><span className="popup-value">{v.priority}</span></div>
                 <div className="popup-row"><span className="popup-label">Status:</span><span className="popup-value">{v.status}</span></div>
-                <div className="popup-row"><span className="popup-label">Speed:</span><span className="popup-value">{v.speed} km/h</span></div>
-                <div className="popup-row"><span className="popup-label">Destination:</span><span className="popup-value">{v.dest || v.destination?.name}</span></div>
+                <div className="popup-row"><span className="popup-label">Speed / Fuel:</span><span className="popup-value">{v.speed} km/h | {v.fuel}%</span></div>
+                <div className="popup-row"><span className="popup-label">Destination:</span><span className="popup-value">{v.dest}</span></div>
               </Popup>
             </Marker>
           ))}
 
-          {/* Incidents */}
-          {filters.incidents && incidents.map(inc => (
-            <Marker key={inc.id || inc.incidentId} position={[inc.lat || inc.location?.coordinates?.lat || 25.5, inc.lng || inc.location?.coordinates?.lng || 91.8]} icon={createIcon(severityEmoji[inc.severity] || '🟡', 22)}>
-              <Popup>
-                <div className="popup-title">{inc.id || inc.incidentId} - {inc.type}</div>
-                <div className="popup-row"><span className="popup-label">Severity:</span><span className="popup-value">{inc.severity}</span></div>
-                <div style={{ fontSize: 12, marginTop: 4, color: '#475569' }}>{inc.desc || inc.description}</div>
-              </Popup>
-            </Marker>
-          ))}
+          {/* Live Incidents */}
+          {filters.incidents && incidents.map(inc => {
+            const lat = inc.location?.coordinates?.lat || inc.lat || 25.5;
+            const lng = inc.location?.coordinates?.lng || inc.lng || 91.8;
+            return (
+              <Marker
+                key={inc.incidentId || inc.id}
+                position={[lat, lng]}
+                icon={createIcon(severityEmoji[inc.severity] || '🟡', 24)}
+              >
+                <Popup>
+                  <div className="popup-title" style={{ color: inc.severity === 'Critical' ? '#dc2626' : '#d97706' }}>
+                    ⚠️ {inc.incidentId || inc.id} - {inc.type}
+                  </div>
+                  <div className="popup-row"><span className="popup-label">Severity:</span><span className="popup-value">{inc.severity}</span></div>
+                  <div className="popup-row"><span className="popup-label">Location:</span><span className="popup-value">{inc.location?.name || 'Corridor'}</span></div>
+                  <div className="popup-row"><span className="popup-label">Status:</span><span className="popup-value">{inc.status}</span></div>
+                  <div style={{ fontSize: 12, marginTop: 4, color: '#475569', lineHeight: 1.4 }}>{inc.description || inc.desc}</div>
+                </Popup>
+              </Marker>
+            );
+          })}
         </MapContainer>
       </div>
 
       {/* Map Legend */}
-      <div style={{ display: 'flex', gap: 20, padding: '12px 0', fontSize: 12, color: '#475569', flexWrap: 'wrap' }}>
-        <span>🚛 Active Fleet Vehicle</span>
+      <div style={{ display: 'flex', gap: 20, padding: '12px 0', fontSize: 12, color: '#475569', flexWrap: 'wrap', alignItems: 'center' }}>
+        <span>🚚 Active Vehicle</span>
         <span>🔴 Critical Incident</span>
         <span>🟡 Warning / Road Hazard</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 20, height: 4, background: '#059669', display: 'inline-block' }}></span> Open Corridor</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 20, height: 4, background: '#d97706', display: 'inline-block' }}></span> Risky Corridor</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 20, height: 4, background: '#dc2626', display: 'inline-block' }}></span> Blocked Corridor</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 18, height: 4, background: '#059669', display: 'inline-block' }}></span> 🟢 Open Corridor
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 18, height: 4, background: '#d97706', display: 'inline-block' }}></span> 🟡 Risky Corridor
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 18, height: 4, background: '#dc2626', display: 'inline-block' }}></span> 🔴 Blocked Corridor
+        </span>
+        <span>🌉 Bridge Infrastructure</span>
       </div>
     </div>
   );

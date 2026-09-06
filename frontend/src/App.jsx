@@ -66,7 +66,11 @@ function App() {
               <Analytics user={user} />
             </ProtectedRoute>
           } />
-          <Route path="/field-reports" element={<FieldReports user={user} />} />
+          <Route path="/field-reports" element={
+            <ProtectedRoute allowedRoles={['admin', 'government_official', 'field_officer']}>
+              <FieldReports user={user} />
+            </ProtectedRoute>
+          } />
           <Route path="/simulation" element={<Simulation user={user} />} />
           <Route path="/settings" element={<Settings user={user} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
